@@ -1,0 +1,9 @@
+spring:
+  application:
+    name: vector-test-app
+
+server:
+  port: 8080
+
+logging:
+  config: classpath:logback-spring.xml

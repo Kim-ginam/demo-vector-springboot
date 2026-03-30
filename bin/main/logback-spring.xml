@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration>
+
+    <!-- application.yml 의 spring.application.name 을 컨텍스트 변수로 주입 -->
+    <springProperty scope="context" name="appName"
+                    source="spring.application.name"
+                    defaultValue="vector-test-app"/>
+
+    <!--
+        Vector 가 tail 하는 JSON 파일 Appender.
+        환경변수 LOG_PATH 가 있으면 그 경로를, 없으면 프로젝트 루트의 logs/ 를 사용.
+        예) LOG_PATH=/tmp/vector-test ./gradlew bootRun
+    -->
+    <appender name="FILE_JSON" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <file>${LOG_PATH:-logs}/app.log</file>
+        <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+            <!-- 날짜 롤오버 → app.2024-01-15.log -->
+            <fileNamePattern>${LOG_PATH:-logs}/app.%d{yyyy-MM-dd}.log</fileNamePattern>
+            <maxHistory>7</maxHistory>
+            <totalSizeCap>1GB</totalSizeCap>
+        </rollingPolicy>
+
+        <!--
+            LogstashEncoder: 각 로그 라인을 one-line JSON 으로 출력.
+            MDC 에 넣은 모든 키(requestId, endpoint 등)가 자동으로 JSON 최상위 필드로 포함됨.
+
+            예시 출력:
+            {"@timestamp":"2024-01-15T10:30:00.000Z","@version":"1",
+             "message":"Hello from Vector Test!","logger_name":"...","thread_name":"...",
+             "level":"INFO","level_value":20000,
+             "app":"vector-test-app",
+             "requestId":"550e8400-...","endpoint":"/test/log"}
+        -->
+        <encoder class="net.logstash.logback.encoder.LogstashEncoder">
+            <!-- UTC 기준 ISO-8601 타임스탬프 -->
+            <timestampPattern>yyyy-MM-dd'T'HH:mm:ss.SSS'Z'</timestampPattern>
+            <timeZone>UTC</timeZone>
+            <!-- 애플리케이션 이름을 고정 필드로 추가 -->
+            <customFields>{"app":"${appName}"}</customFields>
+        </encoder>
+    </appender>
+
+    <!-- 개발 시 콘솔 확인용(선택) -->
+    <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder>
+            <pattern>%d{HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n</pattern>
+        </encoder>
+    </appender>
+
+    <root level="INFO">
+        <appender-ref ref="FILE_JSON"/>
+        <appender-ref ref="CONSOLE"/>
+    </root>
+
+</configuration>
