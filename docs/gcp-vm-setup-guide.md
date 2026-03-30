@@ -88,7 +88,7 @@ gcloud auth login
 # 브라우저가 열리면 GCP 계정으로 로그인
 
 # 기본 프로젝트 설정
-gcloud config set project gcloud projects add-iam-policy-binding project-d0f933ee-5915-44a1-a01 --member="serviceAccount:vector-vm-sa@project-d0f933ee-5915-44a1-a01.iam.gserviceaccount.com" --role="roles/pubsub.publisher"
+gcloud config set project project-d0f933ee-5915-44a1-a01
 
 # 설정 확인
 gcloud config list
@@ -99,7 +99,7 @@ gcloud config list
 ### 2-1. 프로젝트 및 리전 설정
 
 ```bash
-gcloud config set project gcloud projects add-iam-policy-binding project-d0f933ee-5915-44a1-a01 --member="serviceAccount:vector-vm-sa@project-d0f933ee-5915-44a1-a01.iam.gserviceaccount.com" --role="roles/pubsub.publisher"
+gcloud config set project project-d0f933ee-5915-44a1-a01
 gcloud config set compute/region asia-northeast3   # 서울 리전
 gcloud config set compute/zone asia-northeast3-a
 ```
@@ -150,9 +150,10 @@ gcloud projects add-iam-policy-binding project-d0f933ee-5915-44a1-a01 --member="
 ### 3-3. 권한 부여 확인
 
 ```bash
-gcloud projects add-iam-policy-binding project-d0f933ee-5915-44a1-a01 `
-  --member="serviceAccount:vector-vm-sa@project-d0f933ee-5915-44a1-a01.iam.gserviceaccount.com" `
-  --role="roles/pubsub.publisher"
+gcloud projects get-iam-policy project-d0f933ee-5915-44a1-a01 `
+  --flatten="bindings[].members" `
+  --filter="bindings.members:vector-vm-sa@*" `
+  --format="table(bindings.role)"
 ```
 
 **필요한 IAM Role 정리**
@@ -321,14 +322,20 @@ mv ~/vector.yaml ~/demo-springboot/vector/
 
 ---
 
-### 방법 B: Git 저장소 사용 (VM 내부에서 실행)
-
-프로젝트를 GitHub 등에 push 한 경우:
+### 방법 B: Git 저장소 사용 ✅ (현재 완료)
 
 ```bash
 sudo apt-get install -y git
 git clone https://github.com/YOUR_REPO/demo-springboot.git ~/demo-springboot
 ```
+
+> git clone 완료 후 아래 순서로 진행합니다.
+>
+> 1. **[섹션 7]** `vector.yaml` 편집 — 로그 파일 경로(whoami 결과 반영) + `credentials_path` 줄 제거
+> 2. **[섹션 8]** ADC 인증 확인 — 서비스 계정 이메일 및 Pub/Sub publish 권한 테스트
+> 3. **[섹션 9]** Spring Boot 빌드(`gradle build -x test`) 후 백그라운드 실행
+> 4. **[섹션 10]** Vector 백그라운드 실행
+> 5. **[섹션 11]** API 호출 → 로그 파일 확인 → Pub/Sub 메시지 수신 확인
 
 ---
 
@@ -389,13 +396,13 @@ sources:
   app_logs:
     type: file
     include:
-      - /home/user/demo-springboot/logs/app.log   # ← whoami 결과로 user 부분 변경
+      - /home/gnkim907/demo-vector-springboot/logs/app.log   # ← whoami 결과로 user 부분 변경
     read_from: beginning
 
 # ③ GCP 프로젝트 ID & 토픽
 sinks:
   gcp_pubsub_out:
-    project: gcloud projects add-iam-policy-binding project-d0f933ee-5915-44a1-a01 --member="serviceAccount:vector-vm-sa@project-d0f933ee-5915-44a1-a01.iam.gserviceaccount.com" --role="roles/pubsub.publisher"      # ← 실제 프로젝트 ID 입력
+    project: project-d0f933ee-5915-44a1-a01
     topic: vector-log-ingest
 
     # ④ credentials_path 줄 삭제 또는 주석 처리 (ADC 자동 사용)
@@ -420,20 +427,20 @@ vector validate --config ~/demo-springboot/vector/vector.yaml
 ```bash
 curl -s -H "Metadata-Flavor: Google" `
   "http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/email"
-# vector-vm-sa@gcloud projects add-iam-policy-binding project-d0f933ee-5915-44a1-a01 --member="serviceAccount:vector-vm-sa@project-d0f933ee-5915-44a1-a01.iam.gserviceaccount.com" --role="roles/pubsub.publisher".iam.gserviceaccount.com 출력 확인
+# vector-vm-sa@project-d0f933ee-5915-44a1-a01.iam.gserviceaccount.com 출력 확인
 ```
 
 ### 8-2. Pub/Sub Publish 권한 직접 테스트
 
 ```bash
-TOKEN=$(curl -s -H "Metadata-Flavor: Google" `
-  "http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/token" `
+TOKEN=$(curl -s -H "Metadata-Flavor: Google" \
+  "http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/token" \
   | python3 -c "import sys,json; print(json.load(sys.stdin)['access_token'])")
 
-curl -s -X POST `
-  "https://pubsub.googleapis.com/v1/projects/gcloud projects add-iam-policy-binding project-d0f933ee-5915-44a1-a01 --member="serviceAccount:vector-vm-sa@project-d0f933ee-5915-44a1-a01.iam.gserviceaccount.com" --role="roles/pubsub.publisher"/topics/vector-log-ingest:publish" `
-  -H "Authorization: Bearer $TOKEN" `
-  -H "Content-Type: application/json" `
+curl -s -X POST \
+  "https://pubsub.googleapis.com/v1/projects/project-d0f933ee-5915-44a1-a01/topics/vector-log-ingest:publish" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
   -d '{"messages":[{"data":"dGVzdA=="}]}'
 # {"messageIds":["..."]} 출력 시 인증 및 권한 정상
 ```
@@ -460,7 +467,7 @@ mkdir -p ~/demo-springboot/logs
 ### 9-3. 백그라운드 실행
 
 ```bash
-nohup java -jar build/libs/vector-test-app-0.0.1-SNAPSHOT.jar `
+nohup java -jar build/libs/vector-test-app-0.0.1-SNAPSHOT.jar \
   > /tmp/springboot.out 2>&1 &
 
 echo "Spring Boot PID: $!"
@@ -492,7 +499,7 @@ mkdir -p /tmp/vector-data
 ### 10-2. 백그라운드 실행
 
 ```bash
-nohup vector --config ~/demo-springboot/vector/vector.yaml `
+nohup vector --config ~/demo-springboot/vector/vector.yaml \
   > /tmp/vector.out 2>&1 &
 
 echo "Vector PID: $!"
@@ -562,9 +569,9 @@ tail -f /tmp/vector.out | grep -E "file|pubsub|error|sent"
 ### 11-4. Pub/Sub 메시지 수신 확인
 
 ```bash
-gcloud pubsub subscriptions pull vector-log-sub `
-  --auto-ack `
-  --limit=5 `
+gcloud pubsub subscriptions pull vector-log-sub \
+  --auto-ack \
+  --limit=5 \
   --format=json
 ```
 
@@ -583,7 +590,7 @@ gcloud pubsub subscriptions pull vector-log-sub `
 
 **data 필드 base64 디코딩:**
 ```bash
-echo "eyJAdGltZXN0YW1wIjoiMjAyNC0wMS0xNVQxMDozMDowMC4wMDBaIiwibGV2ZWwiOiJJTkZPIn0=" `
+echo "eyJAdGltZXN0YW1wIjoiMjAyNC0wMS0xNVQxMDozMDowMC4wMDBaIiwibGV2ZWwiOiJJTkZPIn0=" \
   | base64 -d | python3 -m json.tool
 ```
 
@@ -681,7 +688,7 @@ curl "http://VM_EXTERNAL_IP:8080/test/log?message=external-test"
 # 로컬 PC에서 VM에 서비스 계정 재설정
 gcloud compute instances set-service-account vector-test-vm `
   --zone=asia-northeast3-a `
-  --service-account=vector-vm-sa@gcloud projects add-iam-policy-binding project-d0f933ee-5915-44a1-a01 --member="serviceAccount:vector-vm-sa@project-d0f933ee-5915-44a1-a01.iam.gserviceaccount.com" --role="roles/pubsub.publisher".iam.gserviceaccount.com `
+  --service-account=vector-vm-sa@project-d0f933ee-5915-44a1-a01.iam.gserviceaccount.com `
   --scopes=https://www.googleapis.com/auth/pubsub
 ```
 
@@ -695,8 +702,8 @@ gcloud compute instances set-service-account vector-test-vm `
 ```bash
 # Publisher 권한 재부여
 gcloud pubsub topics add-iam-policy-binding vector-log-ingest `
-  --project=gcloud projects add-iam-policy-binding project-d0f933ee-5915-44a1-a01 --member="serviceAccount:vector-vm-sa@project-d0f933ee-5915-44a1-a01.iam.gserviceaccount.com" --role="roles/pubsub.publisher" `
-  --member="serviceAccount:vector-vm-sa@gcloud projects add-iam-policy-binding project-d0f933ee-5915-44a1-a01 --member="serviceAccount:vector-vm-sa@project-d0f933ee-5915-44a1-a01.iam.gserviceaccount.com" --role="roles/pubsub.publisher".iam.gserviceaccount.com" `
+  --project=project-d0f933ee-5915-44a1-a01 `
+  --member="serviceAccount:vector-vm-sa@project-d0f933ee-5915-44a1-a01.iam.gserviceaccount.com" `
   --role="roles/pubsub.publisher"
 ```
 
