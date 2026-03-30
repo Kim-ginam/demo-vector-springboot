@@ -24,8 +24,7 @@ sources:
     # 읽을 파일 경로 (glob 패턴 가능)
     # Spring Boot 를 실행하는 디렉토리에 맞게 절대 경로로 변경할 것
     include:
-      - /home/user/demo-springboot/logs/app.log   # ← 실제 경로로 수정
-      # - /tmp/vector-test/app.log               # LOG_PATH 환경변수 사용 시
+      - /home/gnkim907/demo-springboot/logs/app.log
 
     # read_from:
     #   beginning  → 파일 처음부터 읽음 (테스트/초기 적재 시)
@@ -77,17 +76,10 @@ sinks:
       - parse_and_enrich
 
     # ── GCP 프로젝트 & 토픽 ──────────────────────────────────────────────────
-    project: YOUR_PROJECT_ID        # ← 실제 GCP 프로젝트 ID 로 변경
-    topic: YOUR_TOPIC               # ← 실제 Pub/Sub 토픽 이름으로 변경
+    project: project-d0f933ee-5915-44a1-a01
+    topic: vector-log-ingest
 
-    # ── 인증 방식 (둘 중 하나만 사용) ───────────────────────────────────────
-    #
-    # [방법 A] 서비스 계정 JSON 키 파일 (로컬 환경 / 서비스 계정 직접 지정 시)
-    credentials_path: /path/to/service-account.json  # ← 실제 경로로 변경
-    #
-    # [방법 B] VM/GKE 의 Application Default Credentials (ADC)
-    #   credentials_path 를 완전히 주석 처리하면 ADC 사용.
-    #   VM 에서 실행 중이고 서비스 계정이 붙어 있으면 별도 키 파일 불필요.
+    # VM 메타데이터 서버 ADC 자동 사용 (서비스 계정 JSON 키 파일 불필요)
 
     # ── 메시지 인코딩 ────────────────────────────────────────────────────────
     # Pub/Sub message.data 필드에 JSON 직렬화된 이벤트가 들어감
