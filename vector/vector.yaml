@@ -20,21 +20,10 @@ data_dir: /tmp/vector-data   # ← Windows 이면 C:\vector-data 로 변경
 sources:
   app_logs:
     type: file
-
-    # 읽을 파일 경로 (glob 패턴 가능)
-    # Spring Boot 를 실행하는 디렉토리에 맞게 절대 경로로 변경할 것
+    # Vector는 current 파일만 감시. 아카이브(.gz)는 읽지 않음.
     include:
-      - /home/gnkim907/demo-vector-springboot/logs/app.log
-
-    # read_from:
-    #   beginning  → 파일 처음부터 읽음 (테스트/초기 적재 시)
-    #   end        → 실행 시점 이후의 신규 라인만 읽음 (운영 시 권장)
+      - /data/logs/current/app.log
     read_from: end
-
-    # 체크포인트 파일 저장 위치 (data_dir 아래에 자동 생성됨)
-    # 별도 지정 불필요. data_dir 설정으로 자동 관리됨.
-
-    # 파일 식별: Vector 기본값(checksum) 사용. 별도 설정 불필요.
 
 # -----------------------------------------------------------------------------
 # [2] TRANSFORM  –  JSON 파싱 + 메타데이터 보강
@@ -45,21 +34,11 @@ transforms:
     inputs:
       - app_logs
     source: |
-      # ── 원본 라인(.message)을 JSON 으로 파싱 ──────────────────────────────
-      # parse_json (! 없음) → 실패해도 이벤트를 drop 하지 않음
       parsed, err = parse_json(.message)
       if err == null {
-        # 파싱 성공: LogstashEncoder 필드들을 이벤트 최상위로 flatten
         . = merge(., object!(parsed))
       }
-      # 파싱 실패(non-JSON 라인): .message 원본 그대로 Pub/Sub 전송
-
-      # ── 파이프라인 메타데이터 추가 ──────────────────────────────────────
       .vector_ingested_at = format_timestamp!(now(), format: "%+")
-
-      # ── Vector 내부 필드 정리 (Pub/Sub 페이로드 경량화) ──────────────────
-      # .file  : 원본 파일 경로 (필요하면 남겨도 됨)
-      # .host  : Vector 실행 호스트명
       del(.source_type)
 
 # -----------------------------------------------------------------------------
@@ -79,26 +58,14 @@ sinks:
     type: gcp_pubsub
     inputs:
       - parse_and_enrich
-
-    # ── GCP 프로젝트 & 토픽 ──────────────────────────────────────────────────
     project: project-d0f933ee-5915-44a1-a01
     topic: vector-log-ingest
-
-    # VM 메타데이터 서버 ADC 자동 사용 (서비스 계정 JSON 키 파일 불필요)
-
-    # ── 메시지 인코딩 ────────────────────────────────────────────────────────
-    # Pub/Sub message.data 필드에 JSON 직렬화된 이벤트가 들어감
     encoding:
       codec: json
-
-    # ── 버퍼 설정 (디스크 버퍼 → 재시작/네트워크 장애 시 유실 방지) ──────────
     buffer:
       type: disk
-      max_size: 268435488   # 256 MB
-      when_full: block       # 버퍼가 꽉 차면 수집 중단(데이터 보존 우선)
-      # when_full: drop_newest  # 버퍼가 꽉 차면 신규 이벤트 drop (처리량 우선)
-
-    # ── 재시도 설정 ──────────────────────────────────────────────────────────
+      max_size: 268435488
+      when_full: block
     request:
       retry_attempts: 10
       retry_initial_backoff_secs: 1
