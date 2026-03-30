@@ -46,15 +46,13 @@ transforms:
       - app_logs
     source: |
       # ── 원본 라인(.message)을 JSON 으로 파싱 ──────────────────────────────
-      # parse_json! 은 파싱 실패 시 이벤트를 drop(abort) 함.
-      # 파싱 실패 로그 라인(예: JVM startup 텍스트)도 전송하려면
-      #   parsed, err = parse_json(.message)
-      #   if err != null { abort }
-      # 로 바꾸거나 아래 abort 를 제거.
-      parsed = parse_json!(.message)
-
-      # LogstashEncoder 필드들을 이벤트 최상위로 flatten
-      . = merge(., object!(parsed))
+      # parse_json (! 없음) → 실패해도 이벤트를 drop 하지 않음
+      parsed, err = parse_json(.message)
+      if err == null {
+        # 파싱 성공: LogstashEncoder 필드들을 이벤트 최상위로 flatten
+        . = merge(., object!(parsed))
+      }
+      # 파싱 실패(non-JSON 라인): .message 원본 그대로 Pub/Sub 전송
 
       # ── 파이프라인 메타데이터 추가 ──────────────────────────────────────
       .vector_ingested_at = format_timestamp!(now(), format: "%+")
