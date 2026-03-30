@@ -24,7 +24,7 @@ sources:
     # 읽을 파일 경로 (glob 패턴 가능)
     # Spring Boot 를 실행하는 디렉토리에 맞게 절대 경로로 변경할 것
     include:
-      - /home/gnkim907/demo-springboot/logs/app.log
+      - /home/gnkim907/demo-vector-springboot/logs/app.log
 
     # read_from:
     #   beginning  → 파일 처음부터 읽음 (테스트/초기 적재 시)
