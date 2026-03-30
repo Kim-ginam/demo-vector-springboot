@@ -66,6 +66,15 @@ transforms:
 # [3] SINK  –  GCP Pub/Sub 로 전송
 # -----------------------------------------------------------------------------
 sinks:
+  # ── [디버깅용] 콘솔 출력 ─────────────────────────────────────────────────
+  # Vector가 실제로 읽는 원본 데이터를 터미널에 출력 (문제 확인 후 제거)
+  console_out:
+    type: console
+    inputs:
+      - app_logs
+    encoding:
+      codec: json
+
   gcp_pubsub_out:
     type: gcp_pubsub
     inputs:
