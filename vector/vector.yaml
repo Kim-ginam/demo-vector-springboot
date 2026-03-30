@@ -29,7 +29,7 @@ sources:
     # read_from:
     #   beginning  → 파일 처음부터 읽음 (테스트/초기 적재 시)
     #   end        → 실행 시점 이후의 신규 라인만 읽음 (운영 시 권장)
-    read_from: beginning
+    read_from: end
 
     # 체크포인트 파일 저장 위치 (data_dir 아래에 자동 생성됨)
     # 별도 지정 불필요. data_dir 설정으로 자동 관리됨.
